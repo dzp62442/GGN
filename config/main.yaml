@@ -6,10 +6,9 @@ defaults:
   - loss: [mse]
 
 wandb:
-  project: mvsplat
-  entity: placeholder
-  name: placeholder
-  mode: disabled
+  project: GGN
+  entity: dzp62442-DROPS
+  mode: online
   id: null
 
 mode: train
