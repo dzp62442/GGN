@@ -16,11 +16,15 @@ def rotate_sh(
 
     *_, n = sh_coefficients.shape
     alpha, beta, gamma = matrix_to_angles(rotations)
+    alpha_cpu = alpha.detach().cpu()
+    beta_cpu = beta.detach().cpu()
+    gamma_cpu = gamma.detach().cpu()
     result = []
     for degree in range(isqrt(n)):
-        with torch.cuda.device(device):
-            sh_rotations = wigner_D(degree, alpha, beta, gamma).type(dtype)
-        # sh_rotations = wigner_D(degree, alpha.to(device), beta.to(device), gamma.to(device)).type(dtype).to(device)
+        sh_rotations = (
+            wigner_D(degree, alpha_cpu, beta_cpu, gamma_cpu)
+            .to(device=device, dtype=dtype)
+        )
         sh_rotated = einsum(
             sh_rotations,
             sh_coefficients[..., degree**2 : (degree + 1) ** 2],
