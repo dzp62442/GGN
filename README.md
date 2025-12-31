@@ -1,3 +1,20 @@
+在 OmniScene 数据集上与 SVF-GS 进行对比
+
+### 训练
+
+```bash
+python -m src.main +experiment=omniscene_112x200 \
+output_dir=outputs/omniscene-112x200-ggn
+```
+
+### 测试
+
+```bash
+
+```
+
+---
+
 <p align="center">
     <h1 align="center">Gaussian Graph Network</h1>
 <p align="center">
