@@ -16,6 +16,9 @@ from pytorch_lightning.callbacks import (
 from pytorch_lightning.loggers.wandb import WandbLogger
 import logging
 
+logging.getLogger("PIL").setLevel(logging.WARNING)
+logging.getLogger("PIL.PngImagePlugin").setLevel(logging.WARNING)
+
 # Configure beartype and jaxtyping.
 with install_import_hook(
     ("src",),
