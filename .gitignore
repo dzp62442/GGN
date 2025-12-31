@@ -2,5 +2,7 @@ datasets/
 __pycache__/
 __pycache__
 outputs
+checkpoints
+*.pth
 latest-run
 *.pyc
