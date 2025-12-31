@@ -1,3 +1,6 @@
 datasets/
 __pycache__/
+__pycache__
+outputs
+latest-run
 *.pyc
