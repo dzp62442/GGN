@@ -21,3 +21,7 @@ shuffle_val: true
 test_len: -1
 train_times_per_scene: 1
 highres: false
+
+view_sampler:
+  num_context_views: 6
+  num_target_views: 18
