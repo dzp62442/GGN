@@ -405,10 +405,13 @@ class ModelWrapper(LightningModule):
             self.vlog.info('validation: psnr = {}, ssim = {}, lpips = {}'.format(psnr, ssim, lpips))
             
         # Construct comparison image.
+        context_images = tuple(batch["context"]["image"][0])
+        target_images = tuple(rgb_gt)
+        pred_images = tuple(rgb_softmax)
         comparison = hcat(
-            add_label(vcat(*batch["context"]["image"][0]), "Context"),
-            add_label(vcat(*rgb_gt), "Target (Ground Truth)"),
-            add_label(vcat(*rgb_softmax), "Target (Softmax)"),
+            add_label(vcat(*context_images), "Context"),
+            add_label(vcat(*target_images), "Target (Ground Truth)"),
+            add_label(vcat(*pred_images), "Target (Softmax)"),
         )
         self.logger.log_image(
             "comparison",
