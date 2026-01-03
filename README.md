@@ -4,7 +4,7 @@
 
 ```bash
 python -m src.main +experiment=omniscene_112x200 \
-output_dir=outputs/omniscene-112x200-ggn
+output_dir=checkpoints/omniscene-112x200-ggn
 ```
 
 ### 测试
