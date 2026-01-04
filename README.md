@@ -10,8 +10,20 @@ output_dir=checkpoints/omniscene-112x200-ggn
 ### 测试
 
 ```bash
-
+python -m src.main +experiment=omniscene_112x200 \
+checkpointing.load=checkpoints/omniscene-112x200-ggn/checkpoints/epoch_0-step_100000.ckpt \
+mode=test \
+wandb.mode=disabled \
+test.compute_scores=true \
+test.output_path=outputs/omniscene-112x200-ggn
 ```
+
+- 保存可视化结果（部分实现，可能被注释）
+```bash
+test.save_image=true \
+test.save_video=true
+```
+- 未实现的可视化：`save_gt_image`、`save_depth`、`save_gaussian` 等。
 
 ---
 
