@@ -46,6 +46,21 @@
   2. GGN 的 re10k 默认启用 LPIPS（`loss: [mse, lpips]`）和 `costvolume` encoder，我们会保持这一组合，不在命令行频繁切换 small/base/large 架构，除非额外有算力要求。
   3. 三个阶段的 batch size 都设置为 1，`data_loader.*.num_workers` 沿用原值。与 depthsplat 相同，验证/测试 DataLoader 也走相同的 batch 设定，方便和自有方法对齐。
 
+## PCC 指标补充方案
+1. **相对深度加载（仅 test）**：
+   - 参考 depthsplat 的做法，在 `src/dataset/utils_omniscene.py::load_conditions` 中加入 `load_rel_depth` 分支：读取 DepthAnything-v2 预测的 disparity（`samples_dpt_small`/`sweeps_dpt_small` 下 `.npy`），若发生 resize 需同步缩放；随后执行 `ratio = min(disp.max() / (disp.min() + 0.001), 50.0)`，用 `min_val = disp.max() / ratio` 限制最远/最近比例，再用 `depth = 1 / max(disp, min_val)` 转为相对深度并做 min-max 归一化到 `[0, 1]`。
+   - `DatasetOmniScene` 中仅在 `stage=="test"` 时启用 `load_rel_depth=True`（其余阶段强制 `False` 并返回 `None`），将 `rel_depth` 追加进 `target`，且与 `target["image"]` 维度对齐（含追加的输入帧）。这样既保证指标计算一致，又避免训练/验证阶段的 IO 负担。
+   - 若后续需要使用 `apply_patch_shim`（`src/dataset/shims/patch_shim.py`），需同步支持 `rel_depth` 的中心裁剪（与 `image/masks/intrinsics` 保持对齐），避免因尺寸对齐造成指标偏差。
+2. **测试时渲染深度**：
+   - 当前 `DecoderSplattingCUDA` 已支持深度渲染：当 `depth_mode` 非空时会通过 `render_depth_cuda` 产出 `DecoderOutput.depth`。但是 `ModelWrapper.test_step` 里默认 `depth_mode=None`，因此测试阶段目前不会输出深度。
+   - 为计算 PCC，建议在 `compute_scores=true` 且 `target["rel_depth"]` 存在时，将 `decoder.forward(..., depth_mode="depth")` 打开（与 depthsplat 一致），仅在需要指标时渲染深度，避免额外开销。
+3. **PCC 指标计算位置**：
+   - 在 `src/evaluation/metrics.py` 中新增 `compute_pcc`，实现方式与 depthsplat 一致：基于 `torchmetrics.PearsonCorrCoef`，对 `(b*v, h, w)` 展平后计算相关系数，并在 `@torch.no_grad()` 下返回标量。
+   - 在 `ModelWrapper.test_step` 内与 PSNR/SSIM/LPIPS 同步计算 `compute_pcc(rel_depth, output.depth)`；仅当 `output.depth` 与 `target["rel_depth"]` 同时存在时启用。
+4. **PCC 统计与汇总**：
+   - 复用现有 `test_step_outputs` 与 `on_test_end` 的统计逻辑，新增 `pcc` key，输出 `scores_pcc_all.json` 并写入 `scores_all_avg.json`，与 PSNR/SSIM/LPIPS 保持同级汇总格式。
+   - 若未来加入测试集全集评估流程，也应在对应的指标汇总字典中加入 `pcc`，确保日志与 JSON 报告一致。
+
 ## 后续实现路线
 1. 新增 `config/dataset/omniscene.yaml` 与两份 experiment 配置，确保 Hydra 可以解析 `+experiment=omniscene_*` 并创建 batch size=1 的 DataLoader。
 2. 在 `src/dataset` 下引入 `dataset_omniscene.py` 与 `utils_omniscene.py`，并在 `DATASETS` 注册，以 depthsplat 代码为基础对齐接口（归一化内参、掩码、mini-test 抽样等）。

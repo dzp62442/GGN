@@ -49,14 +49,15 @@ def load_conditions(
     is_input: bool,
     load_rel_depth: bool = False,
     highres: bool = False,
-) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    del load_rel_depth
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
     h_target, w_target = resolution
 
-    def maybe_resize(pil_img: Image.Image, intrinsics: np.ndarray) -> tuple[Image.Image, np.ndarray]:
+    def maybe_resize(
+        pil_img: Image.Image, intrinsics: np.ndarray
+    ) -> tuple[Image.Image, np.ndarray, bool]:
         need_resize = pil_img.height != h_target or pil_img.width != w_target
         if not need_resize:
-            return pil_img, intrinsics
+            return pil_img, intrinsics, False
         scale_h = h_target / pil_img.height
         scale_w = w_target / pil_img.width
         intrinsics = intrinsics.copy()
@@ -65,11 +66,12 @@ def load_conditions(
         intrinsics[0, 2] *= scale_w
         intrinsics[1, 2] *= scale_h
         pil_img = pil_img.resize((w_target, h_target), Image.BILINEAR)
-        return pil_img, intrinsics
+        return pil_img, intrinsics, True
 
     images: list[torch.Tensor] = []
     intrinsics: list[torch.Tensor] = []
     masks: list[torch.Tensor] = []
+    rel_depths: list[np.ndarray] | None = [] if load_rel_depth else None
 
     for raw_path in img_paths:
         param_path = _replace_segment(raw_path, "samples", "samples_param_small")
@@ -85,7 +87,7 @@ def load_conditions(
         if highres:
             img_path = img_path.replace("_small", "")
         image = Image.open(img_path)
-        image, intrinsic = maybe_resize(image, intrinsic)
+        image, intrinsic, resize_flag = maybe_resize(image, intrinsic)
 
         intrinsic = intrinsic.copy()
         intrinsic[0, :] /= w_target
@@ -94,6 +96,24 @@ def load_conditions(
         image = HWC3(np.array(image))
         images.append(torch.from_numpy(image).permute(2, 0, 1).float() / 255.0)
         intrinsics.append(torch.from_numpy(intrinsic))
+
+        if load_rel_depth:
+            depth_path = img_path.replace("sweeps_small", "sweeps_dpt_small")
+            depth_path = depth_path.replace("samples_small", "samples_dpt_small")
+            if highres:
+                depth_path = depth_path.replace("_small", "")
+            depth_path = depth_path.replace(".jpg", ".npy")
+            disp = np.load(depth_path).astype(np.float32)
+            if resize_flag:
+                disp = Image.fromarray(disp)
+                disp = disp.resize((w_target, h_target), Image.BILINEAR)
+                disp = np.array(disp, dtype=np.float32)
+            ratio = min(disp.max() / (disp.min() + 0.001), 50.0)
+            max_val = disp.max()
+            min_val = max_val / ratio
+            depth = 1.0 / np.maximum(disp, min_val)
+            depth = (depth - depth.min()) / (depth.max() - depth.min())
+            rel_depths.append(depth)
 
         if is_input:
             mask = torch.ones((h_target, w_target), dtype=torch.bool)
@@ -112,4 +132,9 @@ def load_conditions(
     images_tensor = torch.stack(images, dim=0)
     intrinsics_tensor = torch.stack(intrinsics, dim=0)
     masks_tensor = torch.stack(masks, dim=0)
-    return images_tensor, masks_tensor, intrinsics_tensor
+    rel_depths_tensor = (
+        None
+        if rel_depths is None
+        else torch.from_numpy(np.stack(rel_depths, axis=0)).float()
+    )
+    return images_tensor, masks_tensor, intrinsics_tensor, rel_depths_tensor

@@ -1,6 +1,7 @@
 wheel
 tqdm
 pytorch_lightning
+torchmetrics
 black
 ruff
 hydra-core
