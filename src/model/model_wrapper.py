@@ -196,12 +196,12 @@ class ModelWrapper(LightningModule):
         assert b == 1
 
         # Render Gaussians.
-        # with self.benchmarker.time("encoder"):
-        gaussians = self.encoder(
-            batch["context"],
-            self.global_step,
-            deterministic=False,
-        )
+        with self.benchmarker.time("encoder"):
+            gaussians = self.encoder(
+                batch["context"],
+                self.global_step,
+                deterministic=False,
+            )
         #     flops_counter.propagate(batch["context"],
         #         self.global_step,
         #         deterministic=False,)
